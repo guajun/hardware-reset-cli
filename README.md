@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-首版软件已实现：USB CDC ACM、V1 通讯协议、Go CLI、非阻塞 GPIO 定时控制，以及 PC13 2.5 Hz 心跳。主机集成测试直接让 Go CLI 与真实 C 协议核心交互。构建、测试及板上验收见 [验证记录](docs/validation.md)。
+首版软件已实现：USB CDC ACM、V1 通讯协议、Go CLI、非阻塞 GPIO 定时控制，以及 PC13 1.25 Hz 心跳。主机集成测试直接让 Go CLI 与真实 C 协议核心交互。构建、测试及板上验收见 [验证记录](docs/validation.md)。
 
 ## 快速使用
 
@@ -100,6 +100,6 @@ Blue Pill 与目标板共地；选择 PA0–PA7 中一路接低有效 RESET，�
 
 Windows/Linux 按开发 VID/PID `0483:5740` 找候选，再通过 HELLO/INFO 验证产品与完整 96 位 UID。该 VID/PID 为 ST 示例配置，不是项目专属分配。macOS 无需 cgo，按 `cu.usbmodem` 找候选并握手，列表 VID/PID 为空。Linux 需当前用户具有串口节点访问权限。
 
-PC13 使用 CubeMX 的 `LED_Pin` / `LED_GPIO_Port` 标签，每 200 ms 翻转一次，完整亮灭周期为 400 ms（2.5 Hz，50% 占空比），主循环使用 `HAL_GetTick()` 计时，不调用阻塞延时。该 LED 为运行心跳，不表示 USB 已连接或复位命令已成功。
+PC13 使用 CubeMX 的 `LED_Pin` / `LED_GPIO_Port` 标签，每 400 ms 翻转一次，完整亮灭周期为 800 ms（1.25 Hz，50% 占空比），主循环使用 `HAL_GetTick()` 计时，不调用阻塞延时。该 LED 为运行心跳，不表示 USB 已连接或复位命令已成功。
 
 第三方组件保留各自许可文件及文件头，详见 [第三方说明](THIRD_PARTY_NOTICES.md)。本项目自有代码的许可证尚未选定，仓库公有状态不代表统一授权。

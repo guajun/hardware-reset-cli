@@ -34,8 +34,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-/* A 400 ms on/off cycle gives a 2.5 Hz heartbeat at 50% duty cycle. */
-#define LED_TOGGLE_INTERVAL_MS 200U
+/* An 800 ms on/off cycle gives a 1.25 Hz heartbeat at 50% duty cycle. */
+#define LED_TOGGLE_INTERVAL_MS 400U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

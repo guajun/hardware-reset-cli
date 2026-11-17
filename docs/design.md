@@ -15,7 +15,7 @@
 | MCU | F103C8，Flash 64 KB / RAM 20 KB，栈保留 2 KB | ARM Debug/Release 链接 map |
 | USB | CDC FS，48 MHz USB 时钟，Line Coding、DTR、断线处理 | 主机枚举和串口验证 |
 | GPIO | PA0–PA7 开漏、初始释放，白名单与定时控制 | C 协议状态机测试及硬件验收 |
-| LED | PC13，每 200 ms 翻转，2.5 Hz | 运行心跳；实际周期需测量 |
+| LED | PC13，每 400 ms 翻转，1.25 Hz | 运行心跳；实际周期需测量 |
 | 接收回调 | 1024 字节环形缓冲，复制后重新挂接 OUT | 分包、溢出、错误恢复测试 |
 | 主循环 | 有界 RX 处理、定时状态机、稳定 TX buffer、LED | 原生 C 测试及 Go/C 集成 |
 | CLI | Go 模块，命令、JSON、退出码、串口合作锁 | Go 测试/vet、三平台 CI |
