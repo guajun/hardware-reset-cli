@@ -33,7 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/* A 400 ms on/off cycle gives a 2.5 Hz heartbeat at 50% duty cycle. */
+#define LED_TOGGLE_INTERVAL_MS 200U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,7 +67,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  uint32_t led_last_toggle_ms;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -89,7 +90,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-
+  led_last_toggle_ms = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -99,6 +100,12 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    uint32_t now_ms = HAL_GetTick();
+    if ((uint32_t)(now_ms - led_last_toggle_ms) >= LED_TOGGLE_INTERVAL_MS)
+    {
+      led_last_toggle_ms = now_ms;
+      HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+    }
   }
   /* USER CODE END 3 */
 }
