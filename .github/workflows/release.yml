@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gcc-arm-none-eabi libnewlib-arm-none-eabi ninja-build
+      - name: Validate installer checksum handling
+        run: python3 scripts/test-installers.py -v
+      - name: Validate protocol and CLI
+        run: |
+          cmake -S firmware/tests -B firmware/build/host -G Ninja
+          cmake --build firmware/build/host
+          ctest --test-dir firmware/build/host --output-on-failure
+          cd cli
+          HWRESET_SIM="$GITHUB_WORKSPACE/firmware/build/host/reset_protocol_sim" go test -race ./...
+          go vet ./...
+      - name: Build release firmware
+        working-directory: firmware
+        run: |
+          cmake --preset Release
+          cmake --build --preset Release
+      - name: Build and package six CLI targets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/release-build.py --version "$RELEASE_TAG" --firmware-dir firmware/build/Release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --generate-notes dist/release/*

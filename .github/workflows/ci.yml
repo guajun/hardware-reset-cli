@@ -30,6 +30,9 @@ jobs:
           cache-dependency-path: cli/go.sum
       - name: Test
         run: go test ./...
+      - name: Test one-line installers against local fixtures
+        working-directory: .
+        run: python scripts/test-installers.py -v
       - name: Vet
         run: go vet ./...
       - name: Check formatting

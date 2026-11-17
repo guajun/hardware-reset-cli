@@ -99,7 +99,7 @@ func (c *Client) readLoop() {
 			}
 		}
 		if err != nil {
-			c.deliver(response{err: &Error{Code: "DISCONNECTED", Message: err.Error()}})
+			c.deliver(response{err: &Error{Code: "DISCONNECTED", Message: "device connection lost: " + err.Error() + "; reconnect the USB board and run hardware-reset-cli list --json"}})
 			return
 		}
 		select {

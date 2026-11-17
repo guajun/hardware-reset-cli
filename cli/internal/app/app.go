@@ -268,7 +268,9 @@ func connect(ctx context.Context, o options, b Backend, p transport.Candidate) (
 	port, e := b.Open(x, p.Port)
 	cancel()
 	if e != nil {
-		return nil, environmentError(e)
+		failure := environmentError(e)
+		failure.Message = fmt.Sprintf("cannot open port %q: %v; check the USB connection and port access, then run hardware-reset-cli list --json", p.Port, e)
+		return nil, failure
 	}
 	c, e := protocol.New(port)
 	if e != nil {
@@ -395,7 +397,11 @@ func selectDevice(ctx context.Context, o options, b Backend, errOut io.Writer) (
 		return nil, &protocol.Error{Code: "INTERRUPTED", Message: err.Error()}
 	}
 	if selected == nil {
-		return nil, &protocol.Error{Code: "DEVICE_NOT_FOUND", Message: "no matching verified device; use list --json for candidate errors"}
+		message := "no verified hardware-reset device found"
+		if o.serial != "" {
+			message = fmt.Sprintf("no verified hardware-reset device with serial %q found", o.serial)
+		}
+		return nil, &protocol.Error{Code: "DEVICE_NOT_FOUND", Message: message + "; connect a USB board running the controller firmware, then run hardware-reset-cli list --json"}
 	}
 	keep = true
 	return selected, nil

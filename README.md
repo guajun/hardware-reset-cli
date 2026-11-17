@@ -8,10 +8,29 @@
 
 ## 快速使用
 
-安装 Go 1.23 或更新版本，连接已烧录本项目固件的 Blue Pill：
+直接安装 Release 中的 Go 编译二进制，**不需要安装 Go**。Windows PowerShell 一行安装：
+
+```powershell
+irm https://github.com/guajun/hardware-reset-cli/releases/latest/download/install.ps1 | iex
+```
+
+Linux / macOS 一行安装：
+
+```sh
+curl -fsSL https://github.com/guajun/hardware-reset-cli/releases/latest/download/install.sh | sh
+```
+
+安装器按操作系统及 amd64/arm64 架构下载对应压缩包，核对 SHA-256 后安装到用户目录。也可从 [Releases](https://github.com/guajun/hardware-reset-cli/releases/latest) 手动下载。二进制、skill 和控制器固件分别安装，CLI 安装器不会烧录硬件。
+
+从源码安装需要 Go 1.23 或更新版本：
 
 ```sh
 go install github.com/guajun/hardware-reset-cli/cli/cmd/hardware-reset-cli@latest
+```
+
+连接已烧录固件的 Blue Pill 后使用：
+
+```sh
 hardware-reset-cli list --json
 hardware-reset-cli reset --port COM5 --pin PA0 --duration-ms 100 --json
 hardware-reset-cli status --serial YOUR_DEVICE_SERIAL --json
@@ -24,6 +43,26 @@ hardware-reset-cli status --serial YOUR_DEVICE_SERIAL --json
 `reset` 等设备完成脉冲并释放后才成功，默认拉低 100 ms，范围 1–10000 ms。超时或断线可能意味着复位已发生，CLI 报告 `outcome: unknown`，不会自动重试。GPIO 时序完成不保证目标系统已经启动。
 
 `assert` 只确认有期限的拉低，CLI 退出关闭串口可能立即释放；需要固定长度脉冲时使用 `reset`。
+
+## 安装 Agent Skill
+
+使用带 `gh skill` 支持的 GitHub CLI 安装；该命令安装使用说明，不安装二进制：
+
+```sh
+gh skill install guajun/hardware-reset-cli hardware-reset-cli --agent codex --scope user
+```
+
+Claude Code / GitHub Copilot 分别将 `--agent` 改为 `claude-code` / `github-copilot`。skill 发布于 [skills/hardware-reset-cli/SKILL.md](skills/hardware-reset-cli/SKILL.md)，包含设备选择、GPIO 接线确认、复位时序、JSON/退出码与断线处理指引。需要固定版本时使用 `hardware-reset-cli@v0.1.0`。
+
+## 没接板子时
+
+可以明确报告错误。`list --json` 在未发现控制器时成功返回 `devices: []`，退出码 0；需要设备的 `info`、`status`、`reset` 等命令返回退出码 **3**，并输出：
+
+```json
+{"schema_version":1,"ok":false,"command":"status","device":null,"data":null,"error":{"code":"DEVICE_NOT_FOUND","message":"...","outcome":"not_started"}}
+```
+
+指定不存在、被占用或无权限的 `--port` 返回退出码 5 / `IO_ERROR`。请求已经发出后再断线返回退出码 9 / `DISCONNECTED`，`outcome` 为 `unknown`；超时为退出码 6。程序不会崩溃，也不会自动重复复位。脚本使用退出码与 `error.code` 判断，不匹配 message 文案。
 
 ## 设计方案
 
