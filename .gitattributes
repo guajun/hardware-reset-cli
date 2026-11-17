@@ -8,5 +8,11 @@
 *.cmake text eol=lf
 CMakeLists.txt text eol=lf
 *.json text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+# Preserve upstream license text verbatim, including its final blank lines.
+third_party/licenses/* -whitespace
 .gitignore text eol=lf
 .gitattributes text eol=lf

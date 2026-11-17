@@ -16,6 +16,8 @@ Desktop.ini
 *.key
 CMakeUserPresets.json
 .cache/
+__pycache__/
+*.pyc
 *.log
 
 # CMake / embedded build and debug output

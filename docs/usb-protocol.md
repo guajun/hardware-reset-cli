@@ -1,6 +1,6 @@
-# USB 通讯协议 v1 草案
+# USB 通讯协议 v1
 
-本文件是待实现的应用层约定，运行在 CDC ACM bulk 字节流上。首版只支持协议主版本 1；所有写操作必须先完成 HELLO。USB 包、串口 read/write 的边界不等于应用帧边界。
+本文件是已实现的应用层约定，运行在 CDC ACM bulk 字节流上。首版只支持协议主版本 1；所有写操作必须先完成 HELLO。USB 包、串口 read/write 的边界不等于应用帧边界。
 
 ## 帧、字段与边界
 
@@ -27,7 +27,7 @@ v1 不增加应用层 CRC，依赖 USB 传输校验，并用严格语法、长�
 | 请求正文（省略 V1 与 id） | 成功响应正文（省略 V1 与 id） | 语义 |
 | --- | --- | --- |
 | `HELLO 1` | `OK HELLO HWRESET 1` | 验证产品与协议主版本 |
-| `INFO` | `OK INFO <fw> <serial> 1 <max_ms> <pins>` | fw 和 serial 均为 1–32 个 ASCII 字母/数字/点/短横线/下划线；max_ms=10000；pins 为逗号分隔列表 |
+| `INFO` | `OK INFO <fw> <serial> 1 <max_ms> <pins>` | fw 为 0.1.0；serial 为 UID96 的 24 位大写十六进制；max_ms=10000；pins 为逗号分隔列表；CLI 对 fw/serial 接受 1–32 个 ASCII 字母/数字/点/短横线/下划线 |
 | `STATUS <pin>` | `OK STATUS <pin> <state> <remaining_ms>` | state 为 ASSERTED 或 RELEASED；释放时 remaining_ms=0 |
 | `RESET <pin> <duration_ms>` | `OK RESET <pin> RELEASED <duration_ms>` | 从已释放状态拉低、设备计时、释放后返回；duration 1–10000 |
 | `ASSERT <pin> <hold_ms>` | `OK ASSERT <pin> ASSERTED <hold_ms>` | 从已释放状态拉低并启动租约后立即响应；hold 1–10000 |
@@ -70,9 +70,9 @@ GPIO 改变后如果最终响应丢失，CLI 必须报告 outcome unknown。重�
 | `UNKNOWN_COMMAND` | 未知命令 |
 | `INVALID_PIN` | 不在固件白名单 |
 | `INVALID_ARGUMENT` | 数值格式、溢出或范围错误 |
-| `BUSY` | 活动写操作或命令队列无空位；本请求未开始 |
+| `BUSY` | 活动写操作或无法预留响应空间；本请求未开始 |
 | `ID_CONFLICT` | 缓存或活动请求中编号与不同内容冲突 |
-| `CANCELLED` | 操作被 RELEASE 或可检测的会话关闭取消 |
+| `CANCELLED` | RESET 被 RELEASE 取消；会话关闭直接释放并清空响应，通常不能再返回原请求结果 |
 | `INTERNAL` | 内部错误，先释放控制引脚，再尝试返回错误 |
 
 完整格式正确但拒绝的请求最多返回一个错误响应；畸形帧错误可使用 id 0，主机把其视为本次通讯失败，不应无限等待匹配编号。
@@ -80,11 +80,13 @@ GPIO 改变后如果最终响应丢失，CLI 必须报告 outcome unknown。重�
 ## 固件实现约束
 
 - USB RX 回调只将数据复制到有界队列，随后重新挂接接收；必须在复用 USB 缓冲前完成复制。解析和 GPIO 调度在主循环完成，不在 USB 回调里等待脉冲或 TX。
-- 建议 RX 环形队列 1024 字节、TX 完整帧队列 4×256 字节、最多 2 条待调度命令；结合 8 项去重缓存与 ST USB 缓冲估算总 RAM，按实际链接 map 验证。空间不足不能截断或覆盖尚未处理的请求。
-- RX 队列满时进入丢弃模式至下一 LF，报告 `BAD_FRAME`；重新恢复前不能执行被截断帧。若还能完整解析新请求而命令槽已满，返回 BUSY。
-- 写操作之前预留其最终响应槽；RELEASE 另保留一个应急响应槽，允许释放逻辑绕过普通队列，不能让 TX 拥塞阻止释放。发送拥塞到无法报告错误时关闭会话并释放，不继续接受写操作。
+- RX 环形队列为 1024 字节（保留一个空槽），TX 完整帧队列为 4×256 字节；按完整行直接调度，不另设待执行命令队列。8 项去重缓存及 USB 缓冲计入 RAM，按链接 map 验证。
+- RX 队列满时丢弃已缓存的所有接收字节，再保持丢弃直到未来 LF，报告 `BAD_FRAME`；重新恢复前不能执行被截断帧。
+- 写操作开始时至少保留两个响应槽，供完成与 RELEASE 使用；RELEASE 直接释放，不等待发送。后续读命令等仍可能填满队列，此时清空会话、释放全部引脚并使握手失效，不继续执行写操作。主机若收不到响应按 unknown 处理。
 - `CDC_Transmit_FS` 返回 BUSY 时保留队首重试；确认已配置且 pClassData 非空后才访问 TxState。发送缓冲必须保持到 USB 发送完成，不能引用已失效栈变量。处理长度恰为 64 的倍数的 USB 传输结束条件。
 - 使用单调毫秒时钟进行非阻塞期限比较，正确处理 tick 回绕；脉冲计时优先于解析和 TX。不能用 HAL_Delay 阻塞整个命令处理循环。
+
+控制状态机与 USB 回调由适配层短临界区串行化。计时与断线处理依赖 MCU 正常运行；独立看门狗和波形测量不在自动化协议测试的保证范围内。
 
 ## 联调验收用例
 

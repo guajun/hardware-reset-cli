@@ -22,6 +22,8 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
+#include "hwreset_app.h"
+#include <string.h>
 
 /* USER CODE END INCLUDE */
 
@@ -94,6 +96,8 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
+static uint8_t line_coding[7] = {0x00,0xC2,0x01,0x00,0,0,8};
+static uint8_t dtr;
 
 /* USER CODE END PRIVATE_VARIABLES */
 
@@ -150,6 +154,8 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_FS =
 static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
+  HWRESET_SessionReset();
+  dtr = 0;
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
@@ -164,6 +170,7 @@ static int8_t CDC_Init_FS(void)
 static int8_t CDC_DeInit_FS(void)
 {
   /* USER CODE BEGIN 4 */
+  HWRESET_SessionReset();
   return (USBD_OK);
   /* USER CODE END 4 */
 }
@@ -178,63 +185,30 @@ static int8_t CDC_DeInit_FS(void)
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 5 */
-  switch(cmd)
+  switch (cmd)
   {
-    case CDC_SEND_ENCAPSULATED_COMMAND:
-
-    break;
-
-    case CDC_GET_ENCAPSULATED_RESPONSE:
-
-    break;
-
-    case CDC_SET_COMM_FEATURE:
-
-    break;
-
-    case CDC_GET_COMM_FEATURE:
-
-    break;
-
-    case CDC_CLEAR_COMM_FEATURE:
-
-    break;
-
-  /*******************************************************************************/
-  /* Line Coding Structure                                                       */
-  /*-----------------------------------------------------------------------------*/
-  /* Offset | Field       | Size | Value  | Description                          */
-  /* 0      | dwDTERate   |   4  | Number |Data terminal rate, in bits per second*/
-  /* 4      | bCharFormat |   1  | Number | Stop bits                            */
-  /*                                        0 - 1 Stop bit                       */
-  /*                                        1 - 1.5 Stop bits                    */
-  /*                                        2 - 2 Stop bits                      */
-  /* 5      | bParityType |  1   | Number | Parity                               */
-  /*                                        0 - None                             */
-  /*                                        1 - Odd                              */
-  /*                                        2 - Even                             */
-  /*                                        3 - Mark                             */
-  /*                                        4 - Space                            */
-  /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
-  /*******************************************************************************/
     case CDC_SET_LINE_CODING:
-
-    break;
-
+      if (length != 7 || pbuf[4] > 2 || pbuf[5] > 4 ||
+          (pbuf[6] != 5 && pbuf[6] != 6 && pbuf[6] != 7 && pbuf[6] != 8 && pbuf[6] != 16))
+        return USBD_FAIL;
+      memcpy(line_coding, pbuf, 7);
+      break;
     case CDC_GET_LINE_CODING:
-
-    break;
-
+      if (length != 7) return USBD_FAIL;
+      memcpy(pbuf, line_coding, 7);
+      break;
     case CDC_SET_CONTROL_LINE_STATE:
-
-    break;
-
-    case CDC_SEND_BREAK:
-
-    break;
-
-  default:
-    break;
+    {
+      if (length != 0) return USBD_FAIL;
+      /* ST passes the setup request for zero-data class requests. */
+      USBD_SetupReqTypedef *request = (USBD_SetupReqTypedef *)pbuf;
+      uint8_t next = (uint8_t)(request->wValue & 1U);
+      if (dtr && !next) HWRESET_SessionReset();
+      dtr = next;
+      break;
+    }
+    default:
+      return USBD_FAIL;
   }
 
   return (USBD_OK);
@@ -259,6 +233,7 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
+  HWRESET_Receive(Buf,*Len);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
@@ -281,6 +256,7 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
+  if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED || hcdc == NULL) return USBD_FAIL;
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }

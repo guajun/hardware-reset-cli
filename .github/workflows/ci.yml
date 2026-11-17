@@ -1,0 +1,96 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: CLI / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: cli
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Build native executable
+        run: |
+          name=hardware-reset-cli
+          if [ "$RUNNER_OS" = Windows ]; then name="$name.exe"; fi
+          mkdir -p ../dist
+          go build -trimpath -o "../dist/$name" ./cmd/hardware-reset-cli
+          "../dist/$name" version --json
+      - name: Package CLI with notices and checksums
+        run: python ../scripts/package.py --kind cli
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cli-${{ runner.os }}-${{ runner.arch }}
+          path: dist/packages/*
+          if-no-files-found: error
+
+  protocol:
+    name: C protocol and Go/C integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Build native protocol tests and simulator
+        run: |
+          cmake -S firmware/tests -B firmware/build/host -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build firmware/build/host
+          ctest --test-dir firmware/build/host --output-on-failure
+      - name: Test Go client against C firmware core
+        working-directory: cli
+        env:
+          HWRESET_SIM: ${{ github.workspace }}/firmware/build/host/reset_protocol_sim
+        run: go test -race ./...
+
+  firmware:
+    name: Firmware / ${{ matrix.preset }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [Debug, Release]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install ARM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gcc-arm-none-eabi libnewlib-arm-none-eabi ninja-build
+      - name: Build
+        working-directory: firmware
+        run: |
+          cmake --preset "${{ matrix.preset }}"
+          cmake --build --preset "${{ matrix.preset }}"
+      - name: Package firmware with notices and checksums
+        run: python3 scripts/package.py --kind firmware --configuration "${{ matrix.preset }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: firmware-${{ matrix.preset }}
+          path: dist/packages/*
+          if-no-files-found: error

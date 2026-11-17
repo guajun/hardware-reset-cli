@@ -591,13 +591,24 @@ static uint8_t  USBD_CDC_Setup(USBD_HandleTypeDef *pdev,
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
     case USB_REQ_TYPE_CLASS :
+      /* Project hardening: EP0 must never exceed the fixed class buffer or
+         the uint8_t CmdLength. The upstream template trusted host wLength. */
+      if ((hcdc == NULL) || (pdev->pUserData == NULL) ||
+          (req->wLength > sizeof(hcdc->data)) || (req->wLength > 255U))
+      {
+        USBD_CtlError(pdev, req);
+        return USBD_FAIL;
+      }
       if (req->wLength)
       {
         if (req->bmRequest & 0x80U)
         {
-          ((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req->bRequest,
-                                                            (uint8_t *)(void *)hcdc->data,
-                                                            req->wLength);
+          if (((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req->bRequest,
+                         (uint8_t *)(void *)hcdc->data, req->wLength) != USBD_OK)
+          {
+            USBD_CtlError(pdev, req);
+            return USBD_FAIL;
+          }
 
           USBD_CtlSendData(pdev, (uint8_t *)(void *)hcdc->data, req->wLength);
         }
@@ -611,8 +622,12 @@ static uint8_t  USBD_CDC_Setup(USBD_HandleTypeDef *pdev,
       }
       else
       {
-        ((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req->bRequest,
-                                                          (uint8_t *)(void *)req, 0U);
+        if (((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req->bRequest,
+                                           (uint8_t *)(void *)req, 0U) != USBD_OK)
+        {
+          USBD_CtlError(pdev, req);
+          return USBD_FAIL;
+        }
       }
       break;
 
@@ -739,13 +754,16 @@ static uint8_t  USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 {
   USBD_CDC_HandleTypeDef   *hcdc = (USBD_CDC_HandleTypeDef *) pdev->pClassData;
 
-  if ((pdev->pUserData != NULL) && (hcdc->CmdOpCode != 0xFFU))
+  if ((hcdc != NULL) && (pdev->pUserData != NULL) && (hcdc->CmdOpCode != 0xFFU))
   {
-    ((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(hcdc->CmdOpCode,
-                                                      (uint8_t *)(void *)hcdc->data,
-                                                      (uint16_t)hcdc->CmdLength);
+    int8_t status = ((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(hcdc->CmdOpCode,
+                            (uint8_t *)(void *)hcdc->data, (uint16_t)hcdc->CmdLength);
     hcdc->CmdOpCode = 0xFFU;
-
+    if (status != USBD_OK)
+    {
+      USBD_CtlError(pdev, &pdev->request);
+      return USBD_FAIL;
+    }
   }
   return USBD_OK;
 }

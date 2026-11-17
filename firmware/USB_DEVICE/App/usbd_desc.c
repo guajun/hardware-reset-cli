@@ -24,6 +24,7 @@
 #include "usbd_conf.h"
 
 /* USER CODE BEGIN INCLUDE */
+#include "hwreset_app.h"
 
 /* USER CODE END INCLUDE */
 
@@ -32,6 +33,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+static uint8_t hw_serial_descriptor[50] = {50, USB_DESC_TYPE_STRING};
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE END PV */
@@ -71,6 +73,8 @@
 #define USBD_INTERFACE_STRING_FS     "CDC Interface"
 
 /* USER CODE BEGIN PRIVATE_DEFINES */
+#undef USBD_PRODUCT_STRING_FS
+#define USBD_PRODUCT_STRING_FS "Hardware Reset Controller"
 
 /* USER CODE END PRIVATE_DEFINES */
 
@@ -286,6 +290,14 @@ uint8_t * USBD_FS_SerialStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length)
    * ID */
   Get_SerialNum();
   /* USER CODE BEGIN USBD_FS_SerialStrDescriptor */
+  char serial[25];
+  HWRESET_Serial(serial);
+  for (unsigned i=0;i<24;i++) {
+    hw_serial_descriptor[2+2*i]=(uint8_t)serial[i];
+    hw_serial_descriptor[3+2*i]=0;
+  }
+  *length=sizeof hw_serial_descriptor;
+  return hw_serial_descriptor;
 
   /* USER CODE END USBD_FS_SerialStrDescriptor */
   return (uint8_t *) USBD_StringSerial;

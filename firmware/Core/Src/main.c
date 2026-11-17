@@ -23,6 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "hwreset_app.h"
 
 /* USER CODE END Includes */
 
@@ -100,6 +101,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HWRESET_Poll();
     uint32_t now_ms = HAL_GetTick();
     if ((uint32_t)(now_ms - led_last_toggle_ms) >= LED_TOGGLE_INTERVAL_MS)
     {
@@ -168,6 +170,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+  HAL_GPIO_WritePin(GPIOA, 0x00FFU, GPIO_PIN_SET);
   __disable_irq();
   while (1)
   {

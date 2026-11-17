@@ -1,6 +1,6 @@
 # CLI 输入输出方案
 
-状态：待实现草案。可执行文件名 `hardware-reset-cli`；首版按一次调用完成一次操作设计，不读取 stdin，不进入交互式菜单，不弹确认提示。
+状态：首版实现约定。可执行文件名 `hardware-reset-cli`；一次调用完成一次操作，不读取 stdin，不进入交互式菜单，不弹确认提示。Go 最低版本 1.23，无需 cgo。
 
 ## 命令与参数
 
@@ -75,7 +75,9 @@ JSON 顶层字段固定为 `schema_version`、`ok`、`command`、`device`、`dat
 
 一次调用打开设备、握手、验证能力、执行请求、读取最终响应并关闭。端口打开/枚举采用独立的 5000 ms 预算（实现须为可能阻塞的系统调用设置边界）；每个候选握手使用 timeout。禁止写命令自动重试；超时/断线后返回 unknown，用户可重新查询状态，但当前状态无法证明是否已经发生过复位。
 
-CLI 对目标端口使用系统独占打开或合作锁；对拒绝独占的环境明确返回占用错误，不声称支持多进程共享一个串口。Ctrl+C 时若端口仍可用，尽力发 `RELEASE` 并最多等待 500 ms，然后退出 130；若确认取消则 outcome 为 cancelled，否则 unknown。设备定时释放作为最终保障。
+CLI 对目标端口使用系统 API 和基于内核锁的合作文件锁，避免多个本程序进程共享端口；其他程序是否尊重独占取决于系统。Ctrl+C 时若端口仍可用，尽力发 `RELEASE` 并最多等待 500 ms，然后退出 130；只有原请求返回 CANCELLED 且 RELEASE 成功时 outcome 为 cancelled，否则 unknown。若确定发送前已取消则为 not_started。设备定时释放作为 MCU 正常运行时的最终保障。
+
+Windows/Linux 候选为 USB `0483:5740`；macOS 候选为 `/dev/cu.usbmodem*`，不读取 USB VID/PID（列表字段为空）。所有候选均通过 HELLO/INFO 验证产品、协议及稳定序列号。
 
 ```powershell
 hardware-reset-cli list --json
