@@ -1,0 +1,63 @@
+# OS / editor local state
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+CMakeUserPresets.json
+.cache/
+*.log
+
+# CMake / embedded build and debug output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+.ninja_deps
+.ninja_log
+*.o
+*.obj
+*.d
+*.elf
+*.axf
+*.hex
+*.bin
+*.map
+*.list
+*.lst
+*.su
+*.stackdump
+
+# Go output; retain go.mod, go.sum and source/vendor libraries
+/bin/
+/dist/
+/cli/bin/
+/cli/dist/
+/cli/hardware-reset-cli
+/cli/hardware-reset-cli.exe
+*.test
+*.test.exe
+*.out
+coverage/
+go.work
+go.work.sum
+
+# CubeIDE / debugger local state (retain .ioc, .mxproject and CMake presets)
+.metadata/
+.settings/
+*.launch
+*.jlink
+JLinkLog.txt
+JLinkSettings.ini
